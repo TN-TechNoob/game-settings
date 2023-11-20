@@ -8,38 +8,29 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-
+    name: Release
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v2
-
-    - name: Create New Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ github.run_number }}
-        release_name: Release ${{ github.run_number }}
-        draft: false
-        prerelease: false
-
-    - name: Get Old Releases
-      run: |
-        echo "::set-output name=old_releases::$(gh release list --json name --limit 10)"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Delete Old Releases
-      run: |
-        OLD_RELEASES="${{ steps.get_old_releases.outputs.old_releases }}"
-        if [[ $OLD_RELEASES == *"Release"* ]]; then
-          IFS=$'\n' read -rd '' -a RELEASES <<< "$OLD_RELEASES"
-          for release in "${RELEASES[@]}"; do
-            if [[ $release != *"v${{ github.run_number }}"* ]]; then
-              gh release delete "$release" -y
-            fi
-          done
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: upload release asset
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./grax
+          asset_name: grax
+          asset_content_type: application/octet-stream
