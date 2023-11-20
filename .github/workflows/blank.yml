@@ -1,40 +1,45 @@
-# This is a basic workflow to help you get started with Actions
+name: Create Release on Push
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main  # 可以根據你的分支名稱修改這裡
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  release:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this Release
-            - First Change
-            - Second Change
-          draft: false
-          prerelease: false
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Create New Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release ${{ github.run_number }}
+        draft: false
+        prerelease: false
+
+    - name: Get Old Releases
+      run: |
+        echo "::set-output name=old_releases::$(gh release list --json name --limit 10)"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Delete Old Releases
+      run: |
+        OLD_RELEASES="${{ steps.get_old_releases.outputs.old_releases }}"
+        if [[ $OLD_RELEASES == *"Release"* ]]; then
+          IFS=$'\n' read -rd '' -a RELEASES <<< "$OLD_RELEASES"
+          for release in "${RELEASES[@]}"; do
+            if [[ $release != *"v${{ github.run_number }}"* ]]; then
+              gh release delete "$release" -y
+            fi
+          done
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
